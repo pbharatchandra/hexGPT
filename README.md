@@ -18,7 +18,10 @@ hexGPT gives you a sleek chat experience with conversation history, export optio
 
 ## 📸 Demo Screenshot
 
-(Add a screenshot of your UI here, e.g., `![Demo](./screenshot.png)`)
+<img width="1918" height="919" alt="Screenshot 2025-08-18 165744" src="https://github.com/user-attachments/assets/cfc08a62-296a-4ee3-af02-6e449f618adf" />
+<img width="1919" height="927" alt="Screenshot 2025-08-18 165750" src="https://github.com/user-attachments/assets/d2924095-456b-4309-958f-9b2306174967" />
+
+
 
 ---
 
