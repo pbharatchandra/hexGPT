@@ -16,11 +16,22 @@ A modern local chatbot UI powered by **LM Studio** and **Express.js**, featuring
 
 ## 📦 Installation
 # 1. Clone the repository
-<pre> ```bash git clone https://github.com/pbharatchandra/hexGPT.git cd hexGPT npm install node server.js ``` </pre>
+```bash
+git clone https://github.com/pbharatchandra/hexGPT.git
+```
+```
 cd hexGPT
-
-# 2. Install dependencies
+```
+```
 npm install
+```
+```
+node server.js
+```
+# 2. Install dependencies
+```
+npm install
+```
 
 # 3. Run the server
 node server.js
@@ -36,12 +47,19 @@ Default API URL in server.js:
 let LMSTUDIO_API_URL = "http://172.19.21.241:1234/v1/chat/completions";
 If LM Studio runs at a different URL (e.g. http://127.0.0.1:1234), you can update it dynamically:
 
+```
 curl -X POST http://localhost:5000/set_api \
+```
+```
   -H "Content-Type: application/json" \
+```
+```
   -d '{"url": "http://127.0.0.1:1234/v1/chat/completions"}'
-  
+  ```
+
+### ✅ Result on GitHub:
 📂 Project Structure
----
+```bash
 hexGPT/
 ├── index.html       # Frontend UI
 ├── style.css        # Chat UI styles
@@ -50,6 +68,7 @@ hexGPT/
 ├── .gitignore       # Ignored files for GitHub
 └── test/
     └── lmstudio.py  # Example test script
+```
 🧑‍💻 Usage
 Open the app in your browser at http://localhost:5000.
 
@@ -77,4 +96,3 @@ If you like this project, please star ⭐ the repository:
 👉 [hexGPT on GitHub](https://github.com/pbharatchandra/hexGPT)
 
 ---
-```bash
