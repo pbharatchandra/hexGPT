@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>hexGPT • modern UI</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-label="Conversations">
+    <div class="brand">
+      <div class="logo">H</div>
+      <div>
+        <h3>HexGPT</h3>
+        <div class="sub">phi-3.5-mini • local</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px; margin-top:8px;">
+      <button id="newConv" class="chip" title="New conversation">+ New</button>
+      <button id="exportBtn" class="chip" title="Export conversation">Export</button>
+      <button id="clearBtn" class="chip" title="Clear all">Clear</button>
+    </div>
+
+    <div class="convos" id="convoList" role="list" aria-label="Conversation list">
+      <!-- conversation items injected here -->
+    </div>
+
+    <div class="sidebar-footer">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div style="font-size:13px; color:var(--muted)">Quick:</div>
+        <button class="chip" data-quick="Summarize this">Summarize</button>
+        <button class="chip" data-quick="Explain like I'm five">ELI5</button>
+      </div>
+      <div style="font-size:13px; color:var(--muted)">v1.0</div>
+    </div>
+  </aside>
+
+  <!-- Chat area -->
+  <section class="chat-card" aria-label="Chat">
+    <div class="chat-header">
+      <div class="title">
+        <div style="width:44px;height:44px;border-radius:8px;background:linear-gradient(90deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;color:white;font-weight:700">A</div>
+        <div>
+          <h2 id="convTitle">Hello World</h2>
+          <div class="sub" id="convDesc">Welcome — ask anything</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">🌗</button>
+        <button id="clearMessages" class="icon-btn" title="Clear messages" aria-label="Clear messages">🧹</button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Messages">
+      <!-- messages appended here -->
+    </div>
+
+    <!-- persistent floating input -->
+    <div class="input-bar">
+      <div style="display:flex;align-items:center; gap:10px;">
+        <div class="chip" id="quick1">Examples</div>
+      </div>
+
+      <div style="flex:1"></div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex:1;max-width:920px;">
+        <div class="input">
+          <input id="userInput" placeholder="Type a message..." autocomplete="off" aria-label="Message input" />
+        </div>
+
+        <button id="attach" class="icon-btn" title="Attach" aria-label="Attach">📎</button>
+        <button id="sendBtn" class="send-btn" title="Send" aria-label="Send">➤</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ======= DOM Elements ======= */
+const messagesEl = document.getElementById('messages');
+const convoListEl = document.getElementById('convoList');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const attachBtn = document.getElementById('attach');
+const themeToggle = document.getElementById('themeToggle');
+const newConvBtn = document.getElementById('newConv');
+const clearBtn = document.getElementById('clearBtn');
+const exportBtn = document.getElementById('exportBtn');
+const quickChips = document.querySelectorAll('.chip[data-quick]');
+
+/* ======= State ======= */
+let conversations = JSON.parse(localStorage.getItem('hex_convos') || '[]');
+let activeConv = conversations[0] || { id: genId(), title: "Hello World", messages: [] };
+if (!conversations.length) { conversations.push(activeConv); saveConvos(); }
+
+/* ======= Utilities ======= */
+function genId(){ return 'c_'+Math.random().toString(36).slice(2,9); }
+function saveConvos(){ localStorage.setItem('hex_convos', JSON.stringify(conversations)); }
+function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+function escapeHtml(s){
+  return (s+'').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+/* ======= Render Functions ======= */
+function renderConvos(){
+  convoListEl.innerHTML = '';
+  for (const conv of conversations){
+    const el = document.createElement('div');
+    el.className = 'conv' + (conv.id === activeConv.id ? ' active' : '');
+    el.dataset.id = conv.id;
+    const lastText = conv.messages.length ? stripHtml(conv.messages[conv.messages.length-1].text).slice(0,40) : 'Empty';
+    el.innerHTML = `
+      <div class="avatar">${escapeHtml(conv.title[0] || 'H')}</div>
+      <div class="meta">
+        <div class="title">${escapeHtml(conv.title)}</div>
+        <div class="hint">${escapeHtml(lastText)}</div>
+      </div>
+    `;
+    el.addEventListener('click', ()=> setActive(conv.id));
+    convoListEl.appendChild(el);
+  }
+}
+function setActive(id){
+  const conv = conversations.find(c=>c.id===id);
+  if (!conv) return;
+  activeConv = conv;
+  document.getElementById('convTitle').textContent = conv.title;
+  document.getElementById('convDesc').textContent = 'Local conversation';
+  saveConvos();
+  renderConvos();
+  renderMessages();
+}
+function renderMessages(){
+  messagesEl.innerHTML = '';
+  for (const m of activeConv.messages){
+    appendMessageElement(m);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function stripHtml(html){
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
+/* Safe image bubble with optional actions (download + delete hook) */
+function imageBubble(url, name='image'){
+  const safeUrl = String(url);
+  const safeName = String(name || 'image').replace(/["<>]/g,'');
+  return `
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      <img alt="${safeName}" src="${safeUrl}" style="max-width: 240px; border-radius: 8px;">
+      <div style="display:flex; gap:8px;">
+        <a href="${safeUrl}" download class="chip" style="text-decoration:none;">Download</a>
+        <button class="chip" data-delete="${safeUrl}" title="Remove from server">Remove</button>
+      </div>
+    </div>
+  `;
+}
+
+/* Defensive message rendering: only trust our own minimal HTML for images, else textContent */
+function appendMessageElement(m, opts={stream:false}){
+  const msgWrap = document.createElement('div');
+  msgWrap.className = 'msg ' + (m.role === 'user' ? 'user' : 'bot');
+
+  const isSystemHtml = typeof m.text === 'string'
+    && (m.text.trim().startsWith('<img') || m.text.includes('data-delete=') || m.text.includes('<a '));
+
+  if (opts.stream && m.role === 'bot') {
+    const span = document.createElement('div');
+    msgWrap.appendChild(span);
+    messagesEl.appendChild(msgWrap);
+    typeStream(span, m.text);
+  } else {
+    if (isSystemHtml) {
+      msgWrap.innerHTML = m.text;
+    } else {
+      msgWrap.textContent = m.text;
+    }
+    messagesEl.appendChild(msgWrap);
+  }
+
+  const meta = document.createElement('div');
+  meta.className='meta-row';
+  meta.textContent = new Date(m.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  meta.setAttribute('aria-label', `Sent at ${meta.textContent}`);
+  messagesEl.appendChild(meta);
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+async function typeStream(el, text){
+  let i=0;
+  while(i <= text.length){
+    el.textContent = text.slice(0,i);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    await sleep(20 + (i>60?6:0));
+    i++;
+  }
+}
+
+/* ======= Typing Indicator ======= */
+let typingEl = null;
+function showTyping(){
+  if (typingEl) return;
+  typingEl = document.createElement('div');
+  typingEl.className = 'typing';
+  typingEl.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  messagesEl.appendChild(typingEl);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function hideTyping(){
+  if (!typingEl) return;
+  typingEl.remove();
+  typingEl = null;
+}
+
+/* ======= Chat Send ======= */
+async function onSend(){
+  const text = userInput.value.trim();
+  if (!text) return;
+
+  const msg = { role:'user', text, time: Date.now() };
+  activeConv.messages.push(msg);
+  appendMessageElement(msg);
+  userInput.value='';
+  saveConvos();
+
+  showTyping();
+  try {
+    const res = await fetch('/chat', {
+      method:'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    hideTyping();
+
+    if (data && data.reply){
+      const botMsg = { role:'bot', text: data.reply, time: Date.now() };
+      activeConv.messages.push(botMsg);
+      appendMessageElement(botMsg, {stream:true});
+      saveConvos();
+    } else {
+      const err = { role:'bot', text: 'Error: invalid response from server', time: Date.now() };
+      activeConv.messages.push(err);
+      appendMessageElement(err);
+      saveConvos();
+    }
+  } catch (err) {
+    hideTyping();
+    const fail = { role:'bot', text: 'Failed to connect to server.', time: Date.now() };
+    activeConv.messages.push(fail);
+    appendMessageElement(fail);
+    saveConvos();
+  }
+}
+
+/* ======= Image Upload (with validation + progress) ======= */
+const fileInput = document.createElement('input');
+fileInput.type = 'file';
+fileInput.accept = 'image/*';
+fileInput.style.display = 'none';
+document.body.appendChild(fileInput);
+
+attachBtn.addEventListener('click', () => fileInput.click());
+
+const MAX_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIMES = new Set(['image/png','image/jpeg','image/jpg','image/webp','image/gif','image/svg+xml']);
+
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files[0];
+  fileInput.value = '';
+  if (!file) return;
+
+  // Client-side validation
+  if (!ALLOWED_MIMES.has(file.type)) {
+    const failMsg = { role: 'bot', text: '❌ Only images (png, jpg, jpeg, webp, gif, svg) are allowed.', time: Date.now() };
+    activeConv.messages.push(failMsg); appendMessageElement(failMsg); saveConvos();
+    return;
+  }
+  if (file.size > MAX_BYTES) {
+    const failMsg = { role: 'bot', text: '❌ File too large. Max 5MB.', time: Date.now() };
+    activeConv.messages.push(failMsg); appendMessageElement(failMsg); saveConvos();
+    return;
+  }
+
+  // Show placeholder with progress
+  const placeholder = { role: 'user', text: `[Uploading image: ${file.name}] 0%`, time: Date.now() };
+  activeConv.messages.push(placeholder);
+  appendMessageElement(placeholder);
+  saveConvos();
+
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const xhr = new XMLHttpRequest();
+    const uploadPromise = new Promise((resolve, reject) => {
+      xhr.open('POST', '/upload');
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 200 && xhr.status < 300 && data.imageUrl) resolve(data);
+          else reject(new Error(data.error || 'Upload failed'));
+        } catch {
+          reject(new Error('Invalid server response'));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          placeholder.text = `[Uploading image: ${file.name}] ${pct}%`;
+          renderMessages();
+        }
+      };
+      xhr.send(formData);
+    });
+
+    const data = await uploadPromise;
+
+    // Replace placeholder with image bubble
+    const imgMsg = {
+      role: 'user',
+      text: imageBubble(data.imageUrl, file.name),
+      time: Date.now()
+    };
+    activeConv.messages.pop(); // remove placeholder
+    activeConv.messages.push(imgMsg);
+    renderMessages();
+    saveConvos();
+
+  } catch (e) {
+    activeConv.messages.pop(); // remove placeholder
+    const failMsg = { role: 'bot', text: `❌ Failed to upload image. ${e?.message || ''}`, time: Date.now() };
+    activeConv.messages.push(failMsg);
+    appendMessageElement(failMsg);
+    saveConvos();
+  }
+});
+
+/* Optional: Click handler for delete action (requires DELETE hook on server) */
+messagesEl.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-delete]');
+  if (!btn) return;
+  const url = btn.getAttribute('data-delete');
+  if (!confirm('Delete this file from server?')) return;
+  try {
+    const res = await fetch('/upload', {
+      method: 'DELETE',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ imageUrl: url })
+    });
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'Delete failed');
+
+    const idx = activeConv.messages.findIndex(m => typeof m.text === 'string' && m.text.includes(url));
+    if (idx >= 0) {
+      activeConv.messages.splice(idx, 1);
+      renderMessages();
+      saveConvos();
+    }
+  } catch (err) {
+    const failMsg = { role: 'bot', text: `❌ Delete failed: ${err.message}`, time: Date.now() };
+    activeConv.messages.push(failMsg);
+    appendMessageElement(failMsg);
+    saveConvos();
+  }
+});
+
+/* Drag & Drop and Paste-to-Upload */
+messagesEl.addEventListener('dragover', e => { e.preventDefault(); });
+messagesEl.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+window.addEventListener('paste', (e) => {
+  const item = [...(e.clipboardData?.items || [])].find(i => i.kind === 'file');
+  if (item) {
+    const file = item.getAsFile();
+    if (file) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      fileInput.dispatchEvent(new Event('change'));
+    }
+  }
+});
+
+/* ======= Events ======= */
+sendBtn.addEventListener('click', onSend);
+userInput.addEventListener('keypress', (e)=>{ if (e.key === 'Enter') onSend(); });
+quickChips.forEach(btn=>btn.addEventListener('click', ()=>{ userInput.value = btn.dataset.quick; userInput.focus(); }));
+document.getElementById('quick1').addEventListener('click', ()=> { userInput.value = 'Give me 3 ideas for a weekend project'; userInput.focus(); });
+themeToggle.addEventListener('click', ()=>{ document.body.classList.toggle('light'); localStorage.setItem('hex_theme', document.body.classList.contains('light') ? 'light' : 'dark'); });
+newConvBtn.addEventListener('click', ()=>{
+  const conv = { id: genId(), title: 'Conversation ' + (conversations.length+1), messages: [] };
+  conversations.unshift(conv); activeConv = conv; saveConvos(); renderConvos(); renderMessages();
+});
+clearBtn.addEventListener('click', ()=>{
+  if (!confirm('Clear all conversations?')) return;
+  conversations = [];
+  activeConv = { id: genId(), title: 'Hello World', messages: [] };
+  conversations.push(activeConv);
+  saveConvos(); renderConvos(); renderMessages();
+});
+exportBtn.addEventListener('click', ()=>{
+  const data = JSON.stringify(activeConv, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = (activeConv.title || 'conversation') + '.json';
+  a.click(); URL.revokeObjectURL(url);
+});
+document.getElementById('clearMessages').addEventListener('click', ()=>{
+  if (!confirm('Clear messages in this conversation?')) return;
+  activeConv.messages = []; saveConvos(); renderMessages();
+});
+
+/* ======= Init ======= */
+if (localStorage.getItem('hex_theme') === 'light') document.body.classList.add('light');
+renderConvos();
+setActive(activeConv.id);
+renderMessages();
+userInput.focus();
+</script>
+
+</body>
+</html>
