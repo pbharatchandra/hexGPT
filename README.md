@@ -16,7 +16,7 @@ A modern local chatbot UI powered by **LM Studio** and **Express.js**, featuring
 
 ## 📦 Installation
 # 1. Clone the repository
-git clone https://github.com/pbharatchandra/hexGPT.git
+<pre> ```bash git clone https://github.com/pbharatchandra/hexGPT.git cd hexGPT npm install node server.js ``` </pre>
 cd hexGPT
 
 # 2. Install dependencies
