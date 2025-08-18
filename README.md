@@ -33,7 +33,6 @@ Dark Mode
 ## 🛠️ Installation & Setup
 
 ### 1. Clone the repository
-```bash
 git clone https://github.com/pbharatchandra/hexGPT.git
 cd hexGPT
 
@@ -119,3 +118,5 @@ If you like this project, please ⭐ the repository on GitHub:
 
 Do you want me to also **add badges** (like Node.js, Express, MIT License, Stars) at the top for a more professional look?
 
+
+```bash
