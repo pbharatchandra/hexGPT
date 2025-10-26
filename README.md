@@ -95,4 +95,7 @@ If you’d like to improve hexGPT, open an issue or submit a pull request.
 If you like this project, please star ⭐ the repository:
 👉 [hexGPT on GitHub](https://github.com/pbharatchandra/hexGPT)
 
+Contact Details:
+Name: P BHARAT CHANDRA
+Mail: pbharatchandra80@gmail.com
 ---
