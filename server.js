@@ -170,4 +170,8 @@ app.post("/chat", async (req, res) => {
 const PORT = 5000;
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
-});
+});curl -X POST http://localhost:5000/set_api \
+  -H "Content-Type: application/json" \
+    -d '{"url": "http://127.0.0.1:1234/v1/chat/completions"}'
+    
+    
